@@ -1,0 +1,449 @@
+openapi: 3.0.3
+info:
+  title: Context Capsule API
+  description: API for saving and restoring your brain state across devices
+  version: 1.0.0
+  contact:
+    email: support@contextcapsule.app
+
+servers:
+  - url: http://localhost:3000
+    description: Development server
+  - url: https://api.contextcapsule.app
+    description: Production server
+
+security:
+  - ClerkAuth: []
+
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      description: Check the health status of the API and its dependencies
+      security: []
+      tags:
+        - System
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Service is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/capsule:
+    get:
+      summary: List capsules
+      description: Get a paginated list of the authenticated user's capsules
+      tags:
+        - Capsules
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapsuleListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      summary: Create capsule
+      description: Create a new capsule with optional artifacts
+      tags:
+        - Capsules
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCapsuleRequest'
+      responses:
+        '201':
+          description: Capsule created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Capsule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/capsule/{id}:
+    get:
+      summary: Get capsule
+      description: Get a specific capsule by ID
+      tags:
+        - Capsules
+      parameters:
+        - $ref: '#/components/parameters/CapsuleId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Capsule'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      summary: Update capsule
+      description: Update a capsule's title or description
+      tags:
+        - Capsules
+      parameters:
+        - $ref: '#/components/parameters/CapsuleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCapsuleRequest'
+      responses:
+        '200':
+          description: Capsule updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Capsule'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Delete capsule
+      description: Delete a capsule and all its artifacts
+      tags:
+        - Capsules
+      parameters:
+        - $ref: '#/components/parameters/CapsuleId'
+      responses:
+        '200':
+          description: Capsule deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/restore/{id}:
+    post:
+      summary: Restore capsule
+      description: Get decryptable data to restore a capsule's state
+      tags:
+        - Capsules
+      parameters:
+        - $ref: '#/components/parameters/CapsuleId'
+      responses:
+        '200':
+          description: Capsule data retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestoreResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/upload:
+    post:
+      summary: Get upload URL
+      description: Get a signed URL for uploading files to R2 storage
+      tags:
+        - Upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadRequest'
+      responses:
+        '200':
+          description: Upload URL generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    ClerkAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Clerk session token
+
+  parameters:
+    CapsuleId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Capsule ID
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, error]
+        timestamp:
+          type: string
+          format: date-time
+        services:
+          type: object
+          properties:
+            database:
+              type: string
+              enum: [connected, disconnected]
+            api:
+              type: string
+              enum: [operational, degraded]
+
+    Capsule:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        snapshotMeta:
+          type: object
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Artifact'
+
+    Artifact:
+      type: object
+      properties:
+        id:
+          type: string
+        capsuleId:
+          type: string
+        kind:
+          type: string
+          enum: [TAB, NOTE, FILE, SELECTION, SCROLL_POSITION]
+        title:
+          type: string
+          nullable: true
+        encryptedBlob:
+          type: string
+          nullable: true
+          description: Client-side encrypted data
+        metadata:
+          type: object
+          nullable: true
+        storageUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateCapsuleRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+        snapshotMeta:
+          type: object
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateArtifactRequest'
+
+    CreateArtifactRequest:
+      type: object
+      required:
+        - kind
+      properties:
+        kind:
+          type: string
+          enum: [TAB, NOTE, FILE, SELECTION, SCROLL_POSITION]
+        title:
+          type: string
+        encryptedBlob:
+          type: string
+          description: Client-side encrypted data (base64)
+        metadata:
+          type: object
+        storageUrl:
+          type: string
+
+    UpdateCapsuleRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+
+    CapsuleListResponse:
+      type: object
+      properties:
+        capsules:
+          type: array
+          items:
+            $ref: '#/components/schemas/Capsule'
+        pagination:
+          type: object
+          properties:
+            total:
+              type: integer
+            limit:
+              type: integer
+            offset:
+              type: integer
+
+    RestoreResponse:
+      type: object
+      properties:
+        capsule:
+          type: object
+          properties:
+            id:
+              type: string
+            title:
+              type: string
+            description:
+              type: string
+              nullable: true
+            snapshotMeta:
+              type: object
+              nullable: true
+        artifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Artifact'
+
+    UploadRequest:
+      type: object
+      required:
+        - fileName
+        - contentType
+      properties:
+        fileName:
+          type: string
+        contentType:
+          type: string
+        artifactId:
+          type: string
+
+    UploadResponse:
+      type: object
+      properties:
+        uploadUrl:
+          type: string
+          format: uri
+          description: Signed URL for uploading the file
+        storageKey:
+          type: string
+          description: Key to reference the uploaded file
+        expiresIn:
+          type: integer
+          description: Seconds until the upload URL expires
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+
+  responses:
+    Unauthorized:
+      description: Unauthorized - Invalid or missing authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    BadRequest:
+      description: Bad Request - Invalid input
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Not Found - Resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+tags:
+  - name: System
+    description: System health and status
+  - name: Capsules
+    description: Capsule management operations
+  - name: Upload
+    description: File upload operations
