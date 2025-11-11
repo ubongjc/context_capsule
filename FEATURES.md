@@ -515,6 +515,30 @@ NODE_ENV=production
 
 ## Changelog
 
+### Version 1.2.1 (2025-11-11)
+
+**Comprehensive Security Audit**
+
+**Security Review:**
+- 🔍 Conducted full security audit of codebase
+- 📋 Identified 40 issues (7 Critical, 12 High, 11 Medium, 10 Low)
+- 📄 Created SECURITY_AUDIT.md with detailed findings
+- ⚠️ Documented critical vulnerabilities for immediate attention
+
+**Key Findings:**
+- Artifact ownership bypass vulnerability identified
+- Path traversal risks in storage key generation
+- Race conditions in capsule operations
+- Client-side encryption key storage risks documented
+- Rate limiting IP spoofing potential
+- Missing transaction handling in critical operations
+
+**Recommendations:**
+- See SECURITY_AUDIT.md for complete remediation plan
+- Priority fixes before production launch
+- Implement automated security scanning
+- Add comprehensive monitoring
+
 ### Version 1.2.0 (2025-11-11)
 
 **Complete Web Application UI**
