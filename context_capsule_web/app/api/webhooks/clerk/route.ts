@@ -47,6 +47,12 @@ export async function POST(req: Request) {
   if (eventType === 'user.created' || eventType === 'user.updated') {
     const { id, email_addresses, first_name, last_name } = evt.data
 
+    // Check email_addresses array has at least one element
+    if (!email_addresses || email_addresses.length === 0) {
+      console.error('No email addresses provided for user:', id)
+      return new Response('Missing email addresses', { status: 400 })
+    }
+
     await prisma.user.upsert({
       where: { clerkId: id },
       create: {
@@ -64,7 +70,28 @@ export async function POST(req: Request) {
   if (eventType === 'user.deleted') {
     const { id } = evt.data
     if (id) {
-      await prisma.user.delete({
+      // Log audit before deletion
+      try {
+        const user = await prisma.user.findUnique({
+          where: { clerkId: id }
+        })
+
+        if (user) {
+          await prisma.auditLog.create({
+            data: {
+              userId: user.id,
+              action: 'DELETE_USER',
+              resource: user.id,
+              metadata: { clerkId: id, email: user.email },
+            }
+          })
+        }
+      } catch (auditError) {
+        console.error('Failed to create audit log for user deletion:', auditError)
+      }
+
+      // Use deleteMany instead of delete to avoid error if user doesn't exist
+      await prisma.user.deleteMany({
         where: { clerkId: id },
       })
     }

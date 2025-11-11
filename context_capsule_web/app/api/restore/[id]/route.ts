@@ -68,7 +68,7 @@ export async function POST(
         description: capsule.description,
         snapshotMeta: capsule.snapshotMeta,
       },
-      artifacts: capsule.artifacts.map(artifact => ({
+      artifacts: capsule.artifacts.map((artifact: { id: string; kind: string; title: string | null; encryptedBlob: string | null; metadata: any; storageUrl: string | null }) => ({
         id: artifact.id,
         kind: artifact.kind,
         title: artifact.title,

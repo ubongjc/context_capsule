@@ -113,13 +113,13 @@ export const capsuleSchemas = {
   create: z.object({
     title: z.string().min(1).max(255),
     description: z.string().max(1000).optional(),
-    snapshotMeta: z.record(z.any()).optional(),
+    snapshotMeta: z.record(z.string(), z.any()).optional(),
     artifacts: z.array(
       z.object({
         kind: z.enum(['TAB', 'NOTE', 'FILE', 'SELECTION', 'SCROLL_POSITION']),
         title: z.string().max(255).optional(),
         encryptedBlob: z.string().optional(),
-        metadata: z.record(z.any()).optional(),
+        metadata: z.record(z.string(), z.any()).optional(),
         storageUrl: z.string().url().optional(),
       })
     ).max(100).optional(), // Limit to 100 artifacts per capsule
@@ -145,8 +145,8 @@ export const uploadSchema = z.object({
 
 // ID validation
 export function isValidId(id: string): boolean {
-  // Validate CUID format
-  return /^c[a-z0-9]{24}$/.test(id)
+  // Validate CUID2 format (24-32 lowercase alphanumeric chars)
+  return /^[a-z0-9]{24,32}$/.test(id)
 }
 
 // Email validation
@@ -162,7 +162,7 @@ export function isValidUrl(url: string): boolean {
   })
 }
 
-// Dangerous patterns detection
+// Dangerous patterns detection - enhanced with unicode normalization and entity decoding
 const DANGEROUS_PATTERNS = [
   /<script[^>]*>.*?<\/script>/gi,
   /javascript:/gi,
@@ -170,24 +170,63 @@ const DANGEROUS_PATTERNS = [
   /<iframe/gi,
   /eval\(/gi,
   /document\.cookie/gi,
+  /data:text\/html/gi,
+  /vbscript:/gi,
+  /<embed/gi,
+  /<object/gi,
+  /&#x/gi, // Hex entities
+  /&#\d/gi, // Decimal entities
 ]
 
 export function containsDangerousContent(content: string): boolean {
-  return DANGEROUS_PATTERNS.some(pattern => pattern.test(content))
+  // Normalize unicode to prevent evasion via unicode tricks
+  const normalized = content.normalize('NFKC')
+
+  // Remove null bytes
+  const cleaned = normalized.replace(/\0/g, '')
+
+  // Decode common HTML entities to catch obfuscated attacks
+  const decoded = cleaned
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#x3c;/gi, '<')
+    .replace(/&#60;/gi, '<')
+    .replace(/&#x3e;/gi, '>')
+    .replace(/&#62;/gi, '>')
+
+  // Test against patterns (case-insensitive already via /gi flag)
+  return DANGEROUS_PATTERNS.some(pattern => pattern.test(decoded))
 }
 
 // Validate artifact blob size
 const MAX_BLOB_SIZE = 10 * 1024 * 1024 // 10MB for encrypted blobs
 
 export function validateArtifactBlob(encryptedBlob: string): FileValidationResult {
-  const size = Buffer.from(encryptedBlob, 'base64').length
+  // Validate base64 format and decode with error handling
+  try {
+    // Test if valid base64
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(encryptedBlob)) {
+      return {
+        valid: false,
+        error: 'Invalid base64 format'
+      }
+    }
 
-  if (size > MAX_BLOB_SIZE) {
+    const size = Buffer.from(encryptedBlob, 'base64').length
+
+    if (size > MAX_BLOB_SIZE) {
+      return {
+        valid: false,
+        error: `Encrypted blob exceeds maximum size of ${MAX_BLOB_SIZE / 1024 / 1024}MB`
+      }
+    }
+
+    return { valid: true }
+  } catch (error) {
     return {
       valid: false,
-      error: `Encrypted blob exceeds maximum size of ${MAX_BLOB_SIZE / 1024 / 1024}MB`
+      error: 'Invalid base64 encoding'
     }
   }
-
-  return { valid: true }
 }

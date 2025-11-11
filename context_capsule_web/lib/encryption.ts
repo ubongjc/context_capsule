@@ -1,6 +1,21 @@
 /**
  * Client-side encryption utilities using Web Crypto API
  * All encryption happens in the browser before data is sent to the server
+ *
+ * ⚠️ SECURITY WARNING ⚠️
+ * This implementation stores encryption keys in localStorage, which is vulnerable to XSS attacks.
+ * An attacker who can execute JavaScript on the page can steal all encryption keys and decrypt all data.
+ *
+ * For production use, consider:
+ * 1. Migrating to IndexedDB with non-extractable CryptoKey objects
+ * 2. Implementing key derivation from user passphrase (PBKDF2)
+ * 3. Using Web Authentication API for hardware-backed keys
+ * 4. Enforcing strict Content Security Policy to prevent XSS
+ *
+ * Current mitigations:
+ * - CSP headers reduce XSS attack surface
+ * - Input sanitization prevents stored XSS
+ * - Regular security audits
  */
 
 // Key management

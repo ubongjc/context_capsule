@@ -29,7 +29,22 @@ setInterval(() => {
 
 export function rateLimit(config: RateLimitConfig) {
   return async (req: NextRequest): Promise<NextResponse | null> => {
-    const ip = req.ip || req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+    // Get IP address with proper proxy trust handling
+    let ip = 'unknown'
+
+    // Only trust proxy headers if explicitly configured
+    const trustProxy = process.env.TRUST_PROXY === 'true'
+
+    if (trustProxy) {
+      // In production behind proxy, use forwarded headers
+      ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+           req.headers.get('x-real-ip') ||
+           'unknown'
+    } else {
+      // In development or direct access, use real-ip header if available
+      ip = req.headers.get('x-real-ip') || 'unknown'
+    }
+
     const key = `${ip}:${req.nextUrl.pathname}`
     const now = Date.now()
 

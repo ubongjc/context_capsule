@@ -66,38 +66,42 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Create capsule with artifacts
-    const capsule = await prisma.capsule.create({
-      data: {
-        userId: user.id,
-        title: sanitizedTitle,
-        description: sanitizedDescription,
-        snapshotMeta: validatedData.snapshotMeta || {},
-        artifacts: {
-          create: validatedData.artifacts?.map(artifact => ({
-            kind: artifact.kind,
-            title: artifact.title ? sanitizeString(artifact.title) : undefined,
-            encryptedBlob: artifact.encryptedBlob,
-            metadata: artifact.metadata || {},
-            storageUrl: artifact.storageUrl,
-          })) || [],
+    // Create capsule with artifacts in a transaction
+    const capsule = await prisma.$transaction(async (tx: typeof prisma) => {
+      const newCapsule = await tx.capsule.create({
+        data: {
+          userId: user.id,
+          title: sanitizedTitle,
+          description: sanitizedDescription,
+          snapshotMeta: validatedData.snapshotMeta || {},
+          artifacts: {
+            create: validatedData.artifacts?.map(artifact => ({
+              kind: artifact.kind,
+              title: artifact.title ? sanitizeString(artifact.title) : undefined,
+              encryptedBlob: artifact.encryptedBlob,
+              metadata: artifact.metadata || {},
+              storageUrl: artifact.storageUrl,
+            })) || [],
+          },
         },
-      },
-      include: {
-        artifacts: true,
-      },
-    })
+        include: {
+          artifacts: true,
+        },
+      })
 
-    // Log audit
-    await prisma.auditLog.create({
-      data: {
-        userId: user.id,
-        action: 'CREATE_CAPSULE',
-        resource: capsule.id,
-        metadata: { title: capsule.title },
-        ipAddress: req.ip || req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || null,
-        userAgent: req.headers.get('user-agent') || null,
-      },
+      // Log audit within same transaction
+      await tx.auditLog.create({
+        data: {
+          userId: user.id,
+          action: 'CREATE_CAPSULE',
+          resource: newCapsule.id,
+          metadata: { title: newCapsule.title },
+          ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || null,
+          userAgent: req.headers.get('user-agent') || null,
+        },
+      })
+
+      return newCapsule
     })
 
     return NextResponse.json(capsule, { status: 201 })
@@ -146,8 +150,8 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url)
-    const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 100)
-    const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0)
+    const limit = Math.min(parseInt(searchParams.get('limit') || '10', 10) || 10, 100)
+    const offset = Math.max(parseInt(searchParams.get('offset') || '0', 10) || 0, 0)
     const search = searchParams.get('search')
 
     // Build where clause

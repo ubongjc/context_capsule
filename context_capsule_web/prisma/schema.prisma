@@ -12,12 +12,20 @@ datasource db {
   extensions = [vector]
 }
 
+enum UserRole {
+  USER
+  PRO
+  TEAM
+  ENTERPRISE
+  ADMIN
+}
+
 model User {
   id        String   @id @default(cuid())
   clerkId   String   @unique
   email     String   @unique
   name      String?
-  role      String   @default("user") // user, pro, team, enterprise
+  role      UserRole @default(USER)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -26,6 +34,7 @@ model User {
 
   @@index([clerkId])
   @@index([email])
+  @@index([role])
 }
 
 model Capsule {
@@ -50,6 +59,11 @@ model Artifact {
   capsuleId     String
   kind          String   // TAB, NOTE, FILE, SELECTION, SCROLL_POSITION
   title         String?
+  // STORAGE STRATEGY: Use encryptedBlob for small data (<10MB).
+  // For larger files, upload to R2 first and store URL in storageUrl.
+  // PostgreSQL TEXT can handle large blobs, but R2 is more cost-effective
+  // and performant for files >1MB. Consider migrating to R2-only storage
+  // if blob sizes become an issue.
   encryptedBlob String?  @db.Text // Client-side encrypted data
   metadata      Json?    // URL, position, app name, etc.
   storageUrl    String?  // R2 URL for larger files
@@ -64,6 +78,7 @@ model Artifact {
 
   @@index([capsuleId])
   @@index([kind])
+  @@index([createdAt])
 }
 
 model Subscription {
@@ -84,6 +99,7 @@ model Subscription {
 
   @@index([userId])
   @@index([stripeCustomerId])
+  @@index([status])
 }
 
 model AuditLog {
