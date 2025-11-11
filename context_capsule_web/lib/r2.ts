@@ -1,17 +1,27 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { randomBytes } from 'crypto'
+import path from 'path'
+
+// Validate required environment variables at module load
+const requiredEnvVars = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME']
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    throw new Error(`Missing required environment variable: ${envVar}`)
+  }
+}
 
 // Configure R2 client
 const r2Client = new S3Client({
   region: 'auto',
   endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
   credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
   },
 })
 
-const BUCKET_NAME = process.env.R2_BUCKET_NAME || 'context-capsule-storage'
+const BUCKET_NAME = process.env.R2_BUCKET_NAME!
 
 export async function uploadToR2(
   key: string,
@@ -69,8 +79,27 @@ export async function deleteFromR2(key: string): Promise<void> {
 
 // Generate a unique key for storing files
 export function generateStorageKey(userId: string, fileName: string): string {
+  // Validate userId format (CUID2: 24-32 chars, alphanumeric)
+  const cuid2Regex = /^[a-z0-9]{24,32}$/
+  if (!cuid2Regex.test(userId)) {
+    throw new Error('Invalid userId format')
+  }
+
+  // Use cryptographically secure random
+  const random = randomBytes(16).toString('hex')
   const timestamp = Date.now()
-  const random = Math.random().toString(36).substring(7)
-  const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_')
-  return `${userId}/${timestamp}-${random}-${sanitizedFileName}`
+
+  // Extract basename to prevent directory traversal
+  const basename = path.basename(fileName)
+
+  // Remove null bytes and prevent directory traversal
+  const cleanName = basename.replace(/\0/g, '').replace(/\.\./g, '')
+
+  // Sanitize filename - allow only safe characters
+  const sanitizedFileName = cleanName.replace(/[^a-zA-Z0-9._-]/g, '_')
+
+  // Prevent hidden files
+  const finalName = sanitizedFileName.startsWith('.') ? `_${sanitizedFileName}` : sanitizedFileName
+
+  return `${userId}/${timestamp}-${random}-${finalName}`
 }

@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useUser } from '@clerk/nextjs'
 import { Brain, ArrowLeft, Trash2, Edit, RefreshCw, Loader2, ExternalLink } from 'lucide-react'
 import { decryptArtifactBlob } from '@/lib/encryption'
+import DOMPurify from 'dompurify'
 
 interface Artifact {
   id: string
@@ -44,13 +45,7 @@ export default function CapsuleDetailPage() {
     }
   }, [isLoaded, user, router])
 
-  useEffect(() => {
-    if (user && id) {
-      fetchCapsule()
-    }
-  }, [user, id])
-
-  const fetchCapsule = async () => {
+  const fetchCapsule = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(`/api/capsule/${id}`)
@@ -72,7 +67,13 @@ export default function CapsuleDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
+
+  useEffect(() => {
+    if (user && id) {
+      fetchCapsule()
+    }
+  }, [user, id, fetchCapsule])
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this capsule? This action cannot be undone.')) {
@@ -252,9 +253,13 @@ export default function CapsuleDetailPage() {
         <div className="space-y-6">
           {/* Capsule Info */}
           <div className="rounded-lg bg-white p-6 shadow-sm">
-            <h2 className="mb-2 text-2xl font-bold text-gray-900">{capsule.title}</h2>
+            <h2 className="mb-2 text-2xl font-bold text-gray-900">
+              <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(capsule.title) }} />
+            </h2>
             {capsule.description && (
-              <p className="mb-4 text-gray-600">{capsule.description}</p>
+              <p className="mb-4 text-gray-600">
+                <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(capsule.description) }} />
+              </p>
             )}
             <div className="flex flex-wrap gap-4 text-sm text-gray-500">
               <span>Created: {formatDate(capsule.createdAt)}</span>
@@ -281,7 +286,7 @@ export default function CapsuleDetailPage() {
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
                         <h4 className="font-medium text-gray-900">
-                          {artifact.title || artifact.kind}
+                          <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(artifact.title || artifact.kind) }} />
                         </h4>
                         <span className="text-xs text-gray-500">{artifact.kind}</span>
                       </div>

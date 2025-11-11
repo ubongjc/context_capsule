@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useUser } from '@clerk/nextjs'
 import { Brain, Plus, Search, Filter, Loader2 } from 'lucide-react'
+import DOMPurify from 'dompurify'
 
 interface Capsule {
   id: string
@@ -44,13 +45,7 @@ export default function DashboardPage() {
     }
   }, [isLoaded, user, router])
 
-  useEffect(() => {
-    if (user) {
-      fetchCapsules()
-    }
-  }, [user, page, searchQuery])
-
-  const fetchCapsules = async () => {
+  const fetchCapsules = useCallback(async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams({
@@ -72,7 +67,13 @@ export default function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [page, pageSize, searchQuery])
+
+  useEffect(() => {
+    if (user) {
+      fetchCapsules()
+    }
+  }, [user, fetchCapsules])
 
   const handleSearch = (query: string) => {
     setSearchQuery(query)
@@ -182,11 +183,11 @@ export default function DashboardPage() {
                   className="cursor-pointer rounded-lg border border-gray-200 bg-white p-6 transition-all hover:border-blue-500 hover:shadow-lg"
                 >
                   <h3 className="mb-2 text-lg font-semibold text-gray-900 line-clamp-1">
-                    {capsule.title}
+                    <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(capsule.title) }} />
                   </h3>
                   {capsule.description && (
                     <p className="mb-4 text-sm text-gray-600 line-clamp-2">
-                      {capsule.description}
+                      <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(capsule.description) }} />
                     </p>
                   )}
                   <div className="flex items-center justify-between text-xs text-gray-500">

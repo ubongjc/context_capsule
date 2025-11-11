@@ -1,11 +1,13 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
-export function setSecurityHeaders(response: NextResponse): NextResponse {
-  // Content Security Policy
+export function setSecurityHeaders(response: NextResponse, nonce?: string): NextResponse {
+  // Content Security Policy - hardened without unsafe-eval/unsafe-inline
+  // Use nonces for inline scripts where necessary
+  const nonceDirective = nonce ? `'nonce-${nonce}'` : ''
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com https://*.clerk.accounts.dev https://js.stripe.com",
-    "style-src 'self' 'unsafe-inline'",
+    `script-src 'self' ${nonceDirective} https://challenges.cloudflare.com https://*.clerk.accounts.dev https://js.stripe.com`,
+    `style-src 'self' ${nonceDirective}`,
     "img-src 'self' data: https: blob:",
     "font-src 'self' data:",
     "connect-src 'self' https://*.clerk.accounts.dev https://api.stripe.com https://*.r2.cloudflarestorage.com https://*.sentry.io",
@@ -13,6 +15,7 @@ export function setSecurityHeaders(response: NextResponse): NextResponse {
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
+    "object-src 'none'",
     "upgrade-insecure-requests"
   ].join('; ')
 
@@ -33,8 +36,8 @@ export function setSecurityHeaders(response: NextResponse): NextResponse {
 }
 
 // CORS headers for API routes
-export function setCORSHeaders(response: NextResponse, allowedOrigins: string[] = []): NextResponse {
-  const origin = response.headers.get('origin')
+export function setCORSHeaders(request: NextRequest, response: NextResponse, allowedOrigins: string[] = []): NextResponse {
+  const origin = request.headers.get('origin')
 
   // Default allowed origins
   const defaultOrigins = [
