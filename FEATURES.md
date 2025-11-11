@@ -1,7 +1,7 @@
 # Context Capsule - Features & Implementation Guide
 
 **Last Updated:** 2025-11-11
-**Version:** 1.1.0
+**Version:** 1.2.0
 **Status:** Production Development
 
 ## Table of Contents
@@ -514,6 +514,26 @@ NODE_ENV=production
 ---
 
 ## Changelog
+
+### Version 1.2.0 (2025-11-11)
+
+**Complete Web Application UI**
+
+**Web Application - Pages:**
+- ✅ Capsule detail page with full artifact display
+- ✅ Create capsule page with artifact management
+- ✅ Inline artifact creation with type selection
+- ✅ Restore functionality with client-side decryption
+- ✅ Delete capsule with confirmation dialog
+- ✅ Quick capture actions (tab capture placeholder)
+
+**Features:**
+- ✅ Client-side encryption integrated into UI
+- ✅ Artifact management (add, remove, display)
+- ✅ External link support for TAB artifacts
+- ✅ Formatted timestamps and relative dates
+- ✅ Loading states and error boundaries
+- ✅ Form validation and UX feedback
 
 ### Version 1.1.0 (2025-11-11)
 
